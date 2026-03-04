@@ -18,13 +18,19 @@ uint8_t frame_buffer[FRAME_SIZE];
 int frame_ready = 0;
 
 
-int init(int interface)
+int init()
 {
     int error = 0;
+    int claim_0;
+    int claim_1;
     libusb_context *ctx = NULL;
     libusb_device_handle *dev;
 
     int result = libusb_init(&ctx);
+    if (result != 0) {
+        error = 1;
+        goto cleanup;
+    }
     //printf("%d\n", result);
     
     dev = libusb_open_device_with_vid_pid(ctx, VID, PID);
@@ -33,8 +39,8 @@ int init(int interface)
         goto cleanup;
     };
 
-    int claim = libusb_claim_interface(dev, interface);
-    if (claim != 0){
+    claim_0 = libusb_claim_interface(dev, 0);
+    if (claim_0 != 0){
         error = 1;
         goto cleanup;
     };
@@ -73,20 +79,32 @@ int init(int interface)
         error = 1;
         goto cleanup;
     };
+
+    claim_1 = libusb_claim_interface(dev, 1);
+    if (claim_1 != 0){
+        error = 1;
+        goto cleanup;
+    };
     
 cleanup:
     if (dev != NULL) {
-        if (interface) if (claim >0) libusb_release_interface(dev, interface);
+        if (claim_0 == 0) libusb_release_interface(dev, 0);
+        if (claim_1 == 0) libusb_release_interface(dev, 1);
         libusb_close(dev);
     }
     if (ctx != NULL) {
         libusb_exit(ctx);
-        printf("init+clean success");
     }
     
     return error;
 }
 
+int strem(){
+    
+}
+
 int main(){
-    init(1);
+    int success_init = init();
+    if (success_init == 0) stream();
+
 }
