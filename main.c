@@ -17,8 +17,10 @@
 uint8_t frame_buffer[FRAME_SIZE];
 int frame_ready = 0;
 
-int main()
+
+int init(int interface)
 {
+    int error = 0;
     libusb_context *ctx = NULL;
     libusb_device_handle *dev;
 
@@ -26,34 +28,65 @@ int main()
     //printf("%d\n", result);
     
     dev = libusb_open_device_with_vid_pid(ctx, VID, PID);
-    
-    if (dev != NULL) {
-        int claim = libusb_claim_interface(dev, 0);
-        if (claim == 0){
-            int init_crtl = esp770u_init_unknown(dev);
-            printf("%d\n", init_crtl);
-            if (init_crtl >= 0) {
-                int init_sensor = ar0134_init(dev);
-                printf("%d\n", init_sensor);
-                if (init_sensor >= 0) {
-                    int set_frame_timings = ar0134_set_timings(dev, true);
-                    printf("%d\n", set_frame_timings);
-                    if (set_frame_timings >= 0) {
-                        int set_ae_control = ar0134_set_ae(dev, true); // can be changed for manual, and other param
-                        printf("%d\n", set_ae_control);
-                        if (set_ae_control >= 0) {
-                            int set_sync = ar0134_set_sync(dev, true);
-                            printf("%d\n", set_sync);
-                            if (set_sync >= 0) {
-                                
-                            };
-                        };
-                    };
-                };
-            };
-        };
+    if (dev == NULL) {
+        error = 1;
+        goto cleanup;
     };
 
-    libusb_exit(ctx);
-    return 0;
+    int claim = libusb_claim_interface(dev, interface);
+    if (claim != 0){
+        error = 1;
+        goto cleanup;
+    };
+
+    int init_crtl = esp770u_init_unknown(dev);
+    printf("%d\n", init_crtl);
+    if (init_crtl < 0) {
+        error = 1;
+        goto cleanup;
+    };
+
+    int init_sensor = ar0134_init(dev);
+    printf("%d\n", init_sensor);
+    if (init_sensor < 0) {
+        error = 1;
+        goto cleanup;
+    };
+
+    int set_frame_timings = ar0134_set_timings(dev, true);
+    printf("%d\n", set_frame_timings);
+    if (set_frame_timings < 0) {
+        error = 1;
+        goto cleanup;
+    };
+
+    int set_ae_control = ar0134_set_ae(dev, true); // can be changed for manual, and other param
+    printf("%d\n", set_ae_control);
+    if (set_ae_control < 0) {
+        error = 1;
+        goto cleanup;
+    };
+
+    int set_sync = ar0134_set_sync(dev, true);
+    printf("%d\n", set_sync);
+    if (set_sync < 0) {
+        error = 1;
+        goto cleanup;
+    };
+    
+cleanup:
+    if (dev != NULL) {
+        if (interface) if (claim >0) libusb_release_interface(dev, interface);
+        libusb_close(dev);
+    }
+    if (ctx != NULL) {
+        libusb_exit(ctx);
+        printf("init+clean success");
+    }
+    
+    return error;
+}
+
+int main(){
+    init(1);
 }
