@@ -72,12 +72,12 @@ int ar0134_init(libusb_device_handle *devh)
 	ret = ar0134_read_reg(devh, AR0134_DIGITAL_TEST, &val);
 	if (ret < 0)
 		return ret;
-	/*
+	///*
 	if (val != AR0134_MONO_CHROME) {
 		printf("AR0134: Unexpected mode: 0x%04x\n", val);
 		return -EINVAL;
 	}
-	*/
+	//*/
 	/* Enable embedded register data and statistics. */
 	ret = ar0134_read_reg(devh, AR0134_EMBEDDED_DATA_CTRL, &val);
 	if (ret < 0)

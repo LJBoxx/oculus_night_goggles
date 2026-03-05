@@ -30,8 +30,8 @@ void clean(libusb_context *ctx, libusb_device_handle *dev, int interface_0, int 
 
 int init()
 {
-    int claim_0;
-    int claim_1;
+    int claim_0 = -1;
+    int claim_1 = -1;
     struct uvc_probe_commit_control probe = {0};
     probe.bmHint = 0x0001;
     probe.bFormatIndex = 1;
@@ -43,11 +43,11 @@ int init()
     libusb_device_handle *dev;
 
     int result = libusb_init(&ctx);
+    printf("%d\n", result);
     if (result != 0) {
         clean(ctx, dev, claim_0, claim_1);
         return 1;
     }
-    //printf("%d\n", result);
     
     dev = libusb_open_device_with_vid_pid(ctx, VID, PID);
     if (dev == NULL) {
@@ -67,6 +67,8 @@ int init()
         clean(ctx, dev, claim_0, claim_1);
         return 1;
     };
+
+    esp770u_init_radio(dev);
 
     int init_sensor = ar0134_init(dev);
     printf("%d\n", init_sensor);
@@ -89,7 +91,7 @@ int init()
         return 1;
     };
 
-    int set_sync = ar0134_set_sync(dev, true);
+    int set_sync = ar0134_set_sync(dev, false);
     printf("%d\n", set_sync);
     if (set_sync < 0) {
         clean(ctx, dev, claim_0, claim_1);
@@ -113,15 +115,33 @@ int init()
     int start_steaming = libusb_set_interface_alt_setting(dev, 1, 2);
     printf("%d\n", start_steaming);
     
+    struct libusb_transfer *transfer = libusb_alloc_transfer(24);
+    uint8_t buffer[16384*24];
+
+    libusb_fill_iso_transfer(transfer, dev, 0x81, buffer, sizeof(buffer), 24, NULL, NULL, 5000);
+
+    libusb_set_iso_packet_lengths(transfer, 16384);
+    libusb_submit_transfer(transfer);
+    libusb_handle_events_timeout_completed(ctx, &(struct timeval){.tv_sec = 0, .tv_usec = 100000}, NULL);
+    libusb_handle_events_timeout_completed(ctx, &(struct timeval){.tv_sec = 0, .tv_usec = 100000}, NULL);
+    /* 
+    for (int i = 0; i < 50; i++) {  // 5 seconds
+        libusb_handle_events_timeout_completed(ctx, &(struct timeval){.tv_sec = 0, .tv_usec = 100000}, NULL);
+    }*/
+
+    libusb_cancel_transfer(transfer);
+    libusb_free_transfer(transfer);
+    
+    clean(ctx, dev, claim_0, claim_1);
+
     return 0;
 }
 
 int stream(){
-
+    return 0;
 }
 
 int main(){
     int success_init = init();
     if (success_init == 0) stream();
-
 }
