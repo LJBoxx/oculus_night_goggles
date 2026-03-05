@@ -184,8 +184,7 @@ int stream() {
                                        SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, 0);
     SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
     // Use IYUV; for grayscale we only update the Y-plane (first W*H bytes)
-    SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_IYUV, 
-                                         SDL_TEXTUREACCESS_STREAMING, FRAME_W, FRAME_H);
+    SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, FRAME_W, FRAME_H);
 
     running = 1;
     SDL_Event ev;
@@ -198,7 +197,13 @@ int stream() {
         libusb_handle_events_timeout_completed(ctx, &tv, NULL);
 
         if (frame_ready) {
-            SDL_UpdateTexture(tex, NULL, frame_buffer, FRAME_W);
+            void* pixels;
+            int pitch;
+            SDL_LockTexture(tex, NULL, &pixels, &pitch);
+            memcpy(pixels, frame_buffer, FRAME_SIZE);
+            memset((uint8_t*)pixels + FRAME_SIZE, 128, FRAME_SIZE / 2);
+            SDL_UnlockTexture(tex);
+            //SDL_UpdateTexture(tex, NULL, frame_buffer, FRAME_W);
             SDL_RenderClear(ren);
             SDL_RenderCopy(ren, tex, NULL, NULL);
             SDL_RenderPresent(ren);
