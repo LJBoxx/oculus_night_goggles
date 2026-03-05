@@ -3,6 +3,7 @@
 #include <libusb.h>
 //#include <stdint.h>
 #include <string.h>
+#include <SDL2/SDL.h>
 
 #include "uvc.h"
 #include "esp770u.h"
@@ -20,7 +21,7 @@ int frame_ready = 0;
 libusb_context *ctx = NULL;
 libusb_device_handle *dev;
 struct libusb_transfer *transfers[NUM_TRANSFERS];
-uint8_t buffer[16384*24];
+uint8_t buffer[NUM_TRANSFERS][16384*24];
 int claim_0 = -1;
 int claim_1 = -1;
 int running = 0;
@@ -34,19 +35,48 @@ void clean() {
         }
     }
     if (dev != NULL) {
+        if (claim_1 == 0) {
+            libusb_set_interface_alt_setting(dev, 1, 0);
+            libusb_release_interface(dev, claim_1);
+        }
         if (claim_0 == 0) libusb_release_interface(dev, claim_0);
-        if (claim_1 == 0) libusb_release_interface(dev, claim_1);
         libusb_close(dev);
     }
     if (ctx != NULL) {
         libusb_exit(ctx);
+        SDL_Quit();
     }
 }
 
 void transfer_handler(struct libusb_transfer *transfer) {
-    if (running = 1) {
-        libusb_submit_transfer(transfer);
+    if (running == 0) return;
+
+    static int frame_idx = 0;
+
+    for (int i = 0; i < transfer->num_iso_packets; i++) {
+        struct libusb_iso_packet_descriptor *desc = &transfer->iso_packet_desc[i];
+        if (desc->status != LIBUSB_TRANSFER_COMPLETED) continue;
+
+        // Corrected function name here:
+        uint8_t *data = libusb_get_iso_packet_buffer(transfer, i);
+        if (desc->actual_length < 2) continue;
+
+        uint8_t header_len = data[0];
+        uint8_t header_info = data[1];
+
+        if (header_info & 0x02) { 
+            frame_ready = 1;
+            frame_idx = 0;
+        }
+
+        int payload_size = desc->actual_length - header_len;
+        if (payload_size > 0 && (frame_idx + payload_size) <= FRAME_SIZE) {
+            memcpy(&frame_buffer[frame_idx], data + header_len, payload_size);
+            frame_idx += payload_size;
+        }
     }
+
+    libusb_submit_transfer(transfer);  //used ai to write this block it has some weird stuff going on with sensor saying its got yuyv(color) data and sending y8(greyscale)
 }
 
 int init()
@@ -134,28 +164,52 @@ int init()
     
     for (int i = 0; i < NUM_TRANSFERS; i++) {
         transfers[i]= libusb_alloc_transfer(24);
-        libusb_fill_iso_transfer(transfers[i], dev, 0x81, buffer, sizeof(buffer), 24, transfer_handler, NULL, 5000);
+        libusb_fill_iso_transfer(transfers[i], dev, 0x81, buffer[i], sizeof(buffer[i]), 24, transfer_handler, NULL, 5000);
         libusb_set_iso_packet_lengths(transfers[i], 16384);
-        libusb_submit_transfer(transfers[i]);
+        int ret = libusb_submit_transfer(transfers[i]);
+        if (ret < 0) {
+            clean();
+            return 1;
+        }
     }
 
     return 0;
 }
 
 
-int stream(){
+int stream() {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) return 1;
+
+    SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, 
+                                       SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, 0);
+    SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+    // Use IYUV; for grayscale we only update the Y-plane (first W*H bytes)
+    SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_IYUV, 
+                                         SDL_TEXTUREACCESS_STREAMING, FRAME_W, FRAME_H);
+
     running = 1;
-    for (int i; i < 50; i++) {
-        struct timeval tv = {0, 100000};
-        libusb_handle_events_timeout(ctx, &tv);
+    SDL_Event ev;
+    while (running) {
+        while (SDL_PollEvent(&ev)) {
+            if (ev.type == SDL_QUIT) running = 0;
+        }
+
+        struct timeval tv = {0, 10000}; // 10ms
+        libusb_handle_events_timeout_completed(ctx, &tv, NULL);
+
+        if (frame_ready) {
+            SDL_UpdateTexture(tex, NULL, frame_buffer, FRAME_W);
+            SDL_RenderClear(ren);
+            SDL_RenderCopy(ren, tex, NULL, NULL);
+            SDL_RenderPresent(ren);
+            frame_ready = 0;
+        }
     }
-    running = 0;
     return 0;
 }
 
-int main(){
-    int success_init = init();
-    if (success_init != 0) return 1;
-    stream();
+int main(int argc, char *argv[]) {
+    if (init() == 0) stream();
     clean();
+    return 0;
 }
