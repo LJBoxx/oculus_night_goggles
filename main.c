@@ -26,8 +26,7 @@ uint8_t buffer[NUM_TRANSFERS][16384*24];
 int claim_0 = -1;
 int claim_1 = -1;
 int running = 0;
-int done_attach = 0;
-int done_detach = 0;
+int sensor_id = 0; //default to first sensor
 
 void clean() {
     if (transfers) {
@@ -50,76 +49,6 @@ void clean() {
         SDL_Quit();
     }
 }
-
-static int LIBUSB_CALL hotplug_callback(libusb_context *ctx, libusb_device *devi, libusb_hotplug_event event, void *user_data)
-{
-	struct libusb_device_descriptor desc;
-	libusb_device_handle *new_handle;
-	int rc;
-
-	(void)ctx;
-	(void)devi;
-	(void)event;
-	(void)user_data;
-
-	rc = libusb_get_device_descriptor(devi, &desc);
-	if (LIBUSB_SUCCESS == rc) {
-		printf ("Device attached: %04x:%04x\n", desc.idVendor, desc.idProduct);
-	} else {
-		printf ("Device attached\n");
-		fprintf (stderr, "Error getting device descriptor: %s\n",
-			 libusb_strerror((enum libusb_error)rc));
-	}
-
-	rc = libusb_open (devi, &new_handle);
-	if (LIBUSB_SUCCESS == rc) {
-		if (dev) {
-			libusb_close (dev);
-		}
-		dev = new_handle;
-	} else if (LIBUSB_ERROR_ACCESS != rc
-#if defined(PLATFORM_WINDOWS)
-		&& LIBUSB_ERROR_NOT_SUPPORTED != rc
-		&& LIBUSB_ERROR_NOT_FOUND != rc
-#endif
-		) {
-		fprintf (stderr, "No access to device: %s\n",
-			 libusb_strerror((enum libusb_error)rc));
-	}
-
-	done_attach++;
-
-	return 0;
-} //from https://github.com/libusb/libusb/blob/master/examples/hotplugtest.c
-
-static int LIBUSB_CALL hotplug_callback_detach(libusb_context *ctx, libusb_device *devi, libusb_hotplug_event event, void *user_data)
-{
-	struct libusb_device_descriptor desc;
-	int rc;
-
-	(void)ctx;
-	(void)devi;
-	(void)event;
-	(void)user_data;
-
-	rc = libusb_get_device_descriptor(devi, &desc);
-	if (LIBUSB_SUCCESS == rc) {
-		printf ("Device detached: %04x:%04x\n", desc.idVendor, desc.idProduct);
-	} else {
-		printf ("Device detached\n");
-		fprintf (stderr, "Error getting device descriptor: %s\n",
-			 libusb_strerror((enum libusb_error)rc));
-	}
-
-	if (dev) {
-		libusb_close (dev);
-		dev = NULL;
-	}
-
-	done_detach++;
-
-	return 0;
-} //from https://github.com/libusb/libusb/blob/master/examples/hotplugtest.c
 
 void transfer_handler(struct libusb_transfer *transfer) {
     if (running == 0) return;
@@ -152,6 +81,30 @@ void transfer_handler(struct libusb_transfer *transfer) {
     libusb_submit_transfer(transfer);  //used ai to write this block it has some weird stuff going on with sensor saying its got yuyv(color) data and sending y8(greyscale)
 }
 
+libusb_device_handle* open_sensor_by_index(libusb_context *ctx, int index) {
+    libusb_device **list;
+    libusb_device_handle *handle = NULL;
+    int found = 0;
+    
+    ssize_t cnt = libusb_get_device_list(ctx, &list);
+    
+    for (ssize_t i = 0; i < cnt; i++) {
+        struct libusb_device_descriptor desc;
+        libusb_get_device_descriptor(list[i], &desc);
+        
+        if (desc.idVendor == VID && desc.idProduct == PID) {
+            if (found == index) {
+                libusb_open(list[i], &handle);
+                break;
+            }
+            found++;
+        }
+    }
+    
+    libusb_free_device_list(list, 1);
+    return handle;
+}
+
 int init()
 {
     struct uvc_probe_commit_control probe = {0};
@@ -169,7 +122,8 @@ int init()
         return 1;
     }
     
-    dev = libusb_open_device_with_vid_pid(ctx, VID, PID); //need to change that for multiple device support
+    //dev = libusb_open_device_with_vid_pid(ctx, VID, PID); //need to change that for multiple device support
+    dev = open_sensor_by_index(ctx, sensor_id);
     if (dev == NULL) {
         clean();
         return 1;
@@ -256,7 +210,7 @@ int stream() {
     SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, 0);
     //SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 960, 0);
     SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
-    //SDL_SetWindowResizable(win, SDL_TRUE);
+    SDL_SetWindowResizable(win, SDL_TRUE);
     // Use IYUV; for grayscale we only update the Y-plane (first W*H bytes)
     SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, FRAME_W, FRAME_H);
 
@@ -287,68 +241,9 @@ int stream() {
     return 0;
 }
 
-/*int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
+    sensor_id = atoi(argv[1]);
     if (init() == 0) stream();
     clean();
     return 0;
-}*/
-
-int main(int argc, char *argv[])
-{
-	libusb_hotplug_callback_handle hp[2];
-	int product_id, vendor_id, class_id;
-	int rc;
-
-    vendor_id = VID;
-    product_id = PID;
-	//vendor_id  = (argc > 1) ? (int)strtol (argv[1], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
-	//product_id = (argc > 2) ? (int)strtol (argv[2], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
-	class_id   = (argc > 3) ? (int)strtol (argv[3], NULL, 0) : LIBUSB_HOTPLUG_MATCH_ANY;
-
-	rc = libusb_init_context(/*ctx=*/NULL, /*options=*/NULL, /*num_options=*/0);
-	if (LIBUSB_SUCCESS != rc)
-	{
-		printf ("failed to initialise libusb: %s\n",
-			libusb_strerror((enum libusb_error)rc));
-		return EXIT_FAILURE;
-	}
-
-	if (!libusb_has_capability (LIBUSB_CAP_HAS_HOTPLUG)) {
-		printf ("Hotplug capabilities are not supported on this platform\n");
-		libusb_exit (NULL);
-		return EXIT_FAILURE;
-	}
-
-	rc = libusb_hotplug_register_callback (NULL, LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, 0, vendor_id,
-		product_id, class_id, hotplug_callback, NULL, &hp[0]);
-	if (LIBUSB_SUCCESS != rc) {
-		fprintf (stderr, "Error registering callback 0\n");
-		libusb_exit (NULL);
-		return EXIT_FAILURE;
-	}
-
-	rc = libusb_hotplug_register_callback (NULL, LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT, 0, vendor_id,
-		product_id,class_id, hotplug_callback_detach, NULL, &hp[1]);
-	if (LIBUSB_SUCCESS != rc) {
-		fprintf (stderr, "Error registering callback 1\n");
-		libusb_exit (NULL);
-		return EXIT_FAILURE;
-	}
-
-	while (done_detach < done_attach || done_attach == 0) {
-		rc = libusb_handle_events (NULL);
-		if (LIBUSB_SUCCESS != rc)
-			printf ("libusb_handle_events() failed: %s\n",
-				libusb_strerror((enum libusb_error)rc));
-	}
-
-	if (dev) {
-		printf ("Warning: Closing left-over open handle\n");
-		libusb_close (dev);
-	}
-
-    if (init() == 0) stream();
-    clean();
-
-	return EXIT_SUCCESS;
-} //from https://github.com/libusb/libusb/blob/master/examples/hotplugtest.c
+}
