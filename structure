@@ -1,0 +1,1 @@
+so there will be sensor feed that will be displayed and then thses will be compiled into their own binaries so they each get their own process independently and i will have a main binary that will setup the hmd and also then call the bin and resize their windows/swap them 
