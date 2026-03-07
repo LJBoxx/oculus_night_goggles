@@ -1,4 +1,4 @@
-// i should learn cmake too x) but its fine. $$ gcc main.c uvc.c esp770u.c ar0134.c -I/c/msys64/ucrt64/include/libusb-1.0 -I/c/msys64/ucrt64/include/SDL2 -L/c/msys64/ucrt64/lib -lmingw32 -lSDL2main -lSDL2 -lusb-1.0 -o goggles
+// i should learn cmake too x) but its fine. $ gcc main.c uvc.c esp770u.c ar0134.c -I/c/msys64/ucrt64/include/libusb-1.0 -I/c/msys64/ucrt64/include/SDL2 -L/c/msys64/ucrt64/lib -lmingw32 -lSDL2main -lSDL2 -lusb-1.0 -o goggles
 #include <stdio.h>
 #include <libusb.h>
 //#include <stdint.h>
@@ -15,7 +15,9 @@
 #define FRAME_W 1280
 #define FRAME_H 960
 #define FRAME_SIZE (FRAME_W * FRAME_H)
-#define NUM_TRANSFERS 3
+#define NUM_TRANSFERS 10
+#define GAIN_STEP 10
+#define EXPOSURE_STEP 10
 
 uint8_t frame_buffer[FRAME_SIZE];
 int frame_ready = 0;
@@ -27,6 +29,8 @@ int claim_0 = -1;
 int claim_1 = -1;
 int running = 0;
 int sensor_id = 0; //default to first sensor
+int gain =64;
+int exposure = 400;
 
 void clean() {
     if (transfers) {
@@ -144,6 +148,8 @@ int init()
 
     esp770u_init_radio(dev);
 
+    Sleep(250);  //needed else it would show one pic and "freeze"
+
     int init_sensor = ar0134_init(dev);
     printf("%d\n", init_sensor);
     if (init_sensor < 0) {
@@ -158,7 +164,7 @@ int init()
         return 1;
     }
 
-    int set_ae_control = ar0134_set_ae(dev, true); // can be changed for manual, and other param
+    int set_ae_control = ar0134_set_ae(dev, false); // can be changed for manual, and other param
     printf("%d\n", set_ae_control);
     if (set_ae_control < 0) {
         clean();
@@ -211,15 +217,60 @@ int stream() {
     //SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 960, 0);
     SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
     SDL_SetWindowResizable(win, SDL_TRUE);
+    /*//need to make something like that, but not for now since i gotta display that into the headset
+    if (sensor_id == 1) {
+    put window on the right 
+    } else if (sensor_id == 0) {
+    put window on the left
+    }
+    */
     // Use IYUV; for grayscale we only update the Y-plane (first W*H bytes)
     SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, FRAME_W, FRAME_H);
 
+    const Uint8 *state = SDL_GetKeyboardState(NULL);
+
     running = 1;
+    int pressed_g = 0;
+    int pressed_e = 0;
+    int pressed_a = 0;
+    //int pressed_joe = 0;
     SDL_Event ev;
     while (running) {
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) running = 0;
         }
+        
+        if (state[SDL_SCANCODE_G]) {
+            if (pressed_g == 0) {
+                pressed_g = 1;
+                gain += GAIN_STEP;
+                ar0134_set_gain(dev, gain);
+            }
+        } else pressed_g = 0;
+
+        if (state[SDL_SCANCODE_E]) {
+            if (pressed_e == 0) {
+                pressed_e = 1;
+                exposure += EXPOSURE_STEP;
+                ar0134_set_exposure(dev, exposure);
+            }
+        } else pressed_g = 0;
+        
+        if (state[SDL_SCANCODE_G]) {
+            if (pressed_g == 0) {
+                pressed_g = 1;
+                gain += GAIN_STEP;
+                ar0134_set_gain(dev, gain);
+            }
+        } else pressed_g = 0;
+
+        if (state[SDL_SCANCODE_G]) {
+            if (pressed_g == 0) {
+                pressed_g = 1;
+                gain += GAIN_STEP;
+                ar0134_set_gain(dev, gain);
+            }
+        } else pressed_g = 0;
 
         struct timeval tv = {0, 10000}; // 10ms
         libusb_handle_events_timeout_completed(ctx, &tv, NULL);
@@ -242,7 +293,7 @@ int stream() {
 }
 
 int main(int argc, char *argv[]) {
-    sensor_id = atoi(argv[1]);
+    sensor_id = atoi(argv[1]); //unsafe i think lol but whatever x) just dont put anything else than numbers
     if (init() == 0) stream();
     clean();
     return 0;
