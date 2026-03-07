@@ -107,6 +107,11 @@ int ar0134_set_gain(libusb_device_handle *devh, uint16_t gain)
 	return ar0134_write_reg(devh, AR0134_GLOBAL_GAIN, gain);
 }
 
+int ar0134_set_exposure(libusb_device_handle *devh, uint16_t exposure)
+{
+	return ar0134_write_reg(devh, AR0134_COARSE_INTEGRATION_TIME, exposure);
+}
+
 static int ar0134_set_window(libusb_device_handle *devh, uint16_t x_start,
 			     uint16_t y_start, uint16_t x_end, uint16_t y_end)
 {
