@@ -148,7 +148,7 @@ int init()
 
     esp770u_init_radio(dev);
 
-    Sleep(250);  //needed else it would show one pic and "freeze"
+    Sleep(350);  //needed else it would show one pic and "freeze"
 
     int init_sensor = ar0134_init(dev);
     printf("%d\n", init_sensor);
@@ -164,7 +164,9 @@ int init()
         return 1;
     }
 
-    int set_ae_control = ar0134_set_ae(dev, false); // can be changed for manual, and other param
+    Sleep(200);
+    //if (&gain != NULL){}
+    int set_ae_control = ar0134_set_ae(dev, true); // can be changed for manual, and other param
     printf("%d\n", set_ae_control);
     if (set_ae_control < 0) {
         clean();
@@ -233,6 +235,9 @@ int stream() {
     int pressed_g = 0;
     int pressed_e = 0;
     int pressed_a = 0;
+    int pressed_r = 0;
+    int ae = 1;
+    int shift = 0;
     //int pressed_joe = 0;
     SDL_Event ev;
     while (running) {
@@ -240,10 +245,13 @@ int stream() {
             if (ev.type == SDL_QUIT) running = 0;
         }
         
+        if (state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT]) shift = 1; else shift = 0;
+        
         if (state[SDL_SCANCODE_G]) {
             if (pressed_g == 0) {
                 pressed_g = 1;
-                gain += GAIN_STEP;
+                if (shift == 1) gain += GAIN_STEP; else gain -= GAIN_STEP;
+                printf("%d\n", gain);
                 ar0134_set_gain(dev, gain);
             }
         } else pressed_g = 0;
@@ -251,26 +259,32 @@ int stream() {
         if (state[SDL_SCANCODE_E]) {
             if (pressed_e == 0) {
                 pressed_e = 1;
-                exposure += EXPOSURE_STEP;
+                if (shift == 1) exposure += EXPOSURE_STEP; else exposure -= EXPOSURE_STEP;
+                printf("%d\n", exposure);
                 ar0134_set_exposure(dev, exposure);
             }
-        } else pressed_g = 0;
+        } else pressed_e = 0;
         
-        if (state[SDL_SCANCODE_G]) {
-            if (pressed_g == 0) {
-                pressed_g = 1;
-                gain += GAIN_STEP;
-                ar0134_set_gain(dev, gain);
+        if (state[SDL_SCANCODE_A]) {
+            if (pressed_a == 0) {
+                pressed_a = 1;
+                printf("ae");
+                if (ae == 1) {
+                    ar0134_set_ae(dev, false);
+                    ar0134_set_exposure(dev, exposure);
+                    ar0134_set_gain(dev, gain);
+                } else ar0134_set_ae(dev, true);
             }
-        } else pressed_g = 0;
+        } else pressed_a = 0;
 
-        if (state[SDL_SCANCODE_G]) {
-            if (pressed_g == 0) {
-                pressed_g = 1;
-                gain += GAIN_STEP;
-                ar0134_set_gain(dev, gain);
+        if (state[SDL_SCANCODE_R]) {
+            if (pressed_r == 0) {
+                pressed_r = 1;
+                clean();
+                Sleep(500);
+                init();
             }
-        } else pressed_g = 0;
+        } else pressed_r = 0;
 
         struct timeval tv = {0, 10000}; // 10ms
         libusb_handle_events_timeout_completed(ctx, &tv, NULL);
@@ -294,6 +308,12 @@ int stream() {
 
 int main(int argc, char *argv[]) {
     sensor_id = atoi(argv[1]); //unsafe i think lol but whatever x) just dont put anything else than numbers
+/*    if (argv[2] != NULL) {
+        gain = atoi(argv[2]);
+    }
+    if (argv[3] != NULL) {
+        exposure = atoi(argv[3]);
+    }*/
     if (init() == 0) stream();
     clean();
     return 0;
