@@ -1,6 +1,7 @@
 /*
  * Aptina AR0134 Image Sensor initialization
  * Copyright 2017 Philipp Zabel
+ * Modified by LJBoxx
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 #ifndef __AR0134_H__
