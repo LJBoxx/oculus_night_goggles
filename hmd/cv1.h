@@ -17,6 +17,24 @@
 
 //struct tracker;
 
+#define __cpu_to_le16(x) GUINT16_TO_LE(x)
+#define __le16_to_cpu(x) GUINT16_FROM_LE(x)
+
+#define RIFT_DISPLAY_READ_PIXEL     0x01
+#define RIFT_DISPLAY_DIRECT_PENTILE  0x02
+
+// HID Report IDs for CV1
+#define RIFT_KEEPALIVE_REPORT_ID    0x08
+#define RIFT_DISPLAY_REPORT_ID      0x03
+#define RIFT_CV1_POWER_REPORT_ID    0x1d
+
+// Power Flags
+#define RIFT_CV1_POWER_DISPLAY      0x01
+
+// Keepalive Settings
+#define RIFT_KEEPALIVE_TIMEOUT_MS   10000
+#define RIFT_KEEPALIVE_TYPE         0x01
+
 #define OUVRT_TYPE_RIFT (ouvrt_rift_get_type())
 G_DECLARE_FINAL_TYPE(OuvrtRift, ouvrt_rift, OUVRT, RIFT, OuvrtDevice)
 

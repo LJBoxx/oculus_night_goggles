@@ -13,27 +13,6 @@
 #include "device.h"
 #include "cv1.h"
 
-#define __cpu_to_le16(x) GUINT16_TO_LE(x)
-#define __le16_to_cpu(x) GUINT16_FROM_LE(x)
-
-#define RIFT_DISPLAY_READ_PIXEL     0x01
-#define RIFT_DISPLAY_DIRECT_PENTILE  0x02
-
-// HID Report IDs for CV1
-#define RIFT_KEEPALIVE_REPORT_ID    0x01
-#define RIFT_DISPLAY_REPORT_ID      0x03
-#define RIFT_CV1_POWER_REPORT_ID    0x11
-
-// Power Flags
-#define RIFT_CV1_POWER_DISPLAY      0x01
-
-// Keepalive Settings
-#define RIFT_KEEPALIVE_TIMEOUT_MS   10000
-#define RIFT_KEEPALIVE_TYPE         0x01
-
-typedef struct _OuvrtRift OuvrtRift;
-typedef struct _OuvrtRiftClass OuvrtRiftClass;
-
 struct rift_keepalive_report {
     uint8_t id;
     uint8_t type;
@@ -103,7 +82,7 @@ int rift_send_keepalive(OuvrtRift *rift)
 /*
  * Sends a display report to set up low persistence and pixel readback
  * for latency measurement.
- */
+ *
 int rift_send_display(OuvrtRift *rift, bool low_persistence,
 			     bool pixel_readback)
 {
@@ -137,6 +116,28 @@ int rift_send_display(OuvrtRift *rift, bool low_persistence,
 	report.persistence = __cpu_to_le16(persistence);
 
 	return hid_send_feature_report(rift->dev.fd, &report, sizeof(report));
+}*/
+int rift_send_display(OuvrtRift *rift, bool low_persistence, bool pixel_readback)
+{
+    struct rift_display_report report = {
+        .id = RIFT_DISPLAY_REPORT_ID,
+    };
+
+    if (low_persistence) {
+        report.brightness = 255;
+        report.persistence = __cpu_to_le16(1080 * 18 / 100); // ~18% of 1080 rows
+    } else {
+        report.brightness = 0;
+        report.persistence = __cpu_to_le16(1080);
+    }
+
+    if (pixel_readback)
+        report.flags2 |= RIFT_DISPLAY_READ_PIXEL;
+    else
+        report.flags2 &= ~RIFT_DISPLAY_READ_PIXEL;
+    report.flags2 &= ~RIFT_DISPLAY_DIRECT_PENTILE;
+
+    return hid_send_feature_report(rift->dev.fd, &report, sizeof(report));
 }
 
  /*
@@ -144,21 +145,14 @@ int rift_send_display(OuvrtRift *rift, bool low_persistence,
  */
 int rift_cv1_power_up(OuvrtRift *rift, uint8_t components)
 {
-	struct rift_cv1_power_report report = {
-		.id = RIFT_CV1_POWER_REPORT_ID,
-	};
-	int ret;
-
-	ret = hid_get_feature_report(rift->dev.fd, &report, sizeof(report));
-	if (ret < 0)
-		return ret;
-
-	report.components |= components;
-
-	return hid_send_feature_report(rift->dev.fd, &report, sizeof(report));
+    struct rift_cv1_power_report report = {
+        .id = RIFT_CV1_POWER_REPORT_ID,
+        .components = components,
+    };
+    return hid_send_feature_report(rift->dev.fds[0], &report, sizeof(report));
 }
 
-    int rift_cv1_power_down(OuvrtRift *rift, uint8_t components)
+int rift_cv1_power_down(OuvrtRift *rift, uint8_t components)
 {
 	struct rift_cv1_power_report report = {
 		.id = RIFT_CV1_POWER_REPORT_ID,

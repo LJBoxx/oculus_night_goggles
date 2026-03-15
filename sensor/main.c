@@ -1,10 +1,12 @@
-// i should learn cmake too x) but its fine. $ gcc main.c uvc.c esp770u.c ar0134.c -I/c/msys64/ucrt64/include/libusb-1.0 -I/c/msys64/ucrt64/include/SDL2 -L/c/msys64/ucrt64/lib -lmingw32 -lSDL2main -lSDL2 -lusb-1.0 -o goggles
+// i should learn cmake too x) but its fine. $ gcc main.c uvc.c esp770u.c ar0134.c -I/c/msys64/ucrt64/include/libusb-1.0 -I/c/msys64/ucrt64/include/SDL2 -L/c/msys64/ucrt64/lib -lmingw32 -lSDL2main -lSDL2 -lusb-1.0 -lgl -o goggles
 #include <stdio.h>
-#include <libusb.h>
+#include <stdlib.h>
 //#include <stdint.h>
+#include <libusb.h>
 #include <string.h>
 #include <SDL2/SDL.h>
-#include <stdlib.h>
+#include <SDL2/SDL_opengl.h>
+#include <GL/gl.h>
 
 #include "uvc.h"
 #include "esp770u.h"
@@ -214,21 +216,18 @@ int init()
 
 int stream() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) return 1;
-
-    SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, 0);
+    SDL_Window *win;
+    if (sensor_id == 0) { // sensor 0 right sensor 1 left basically use sdl get windows bounds and set pos x left or right
+        win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, 0);
+    } else {
+        win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, 0);
+    }
     //SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 960, 0);
     SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
     SDL_SetWindowResizable(win, SDL_TRUE);
-    /*//need to make something like that, but not for now since i gotta display that into the headset
-    if (sensor_id == 1) {
-    put window on the right 
-    } else if (sensor_id == 0) {
-    put window on the left
-    }
-    */
     // Use IYUV; for grayscale we only update the Y-plane (first W*H bytes)
     SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, FRAME_W, FRAME_H);
-
+    //need to use opengl shaders for distortion correction. 
     const Uint8 *state = SDL_GetKeyboardState(NULL);
 
     running = 1;
@@ -245,6 +244,8 @@ int stream() {
             if (ev.type == SDL_QUIT) running = 0;
         }
         
+        if (state[SDL_SCANCODE_ESCAPE]) running = 0;
+
         if (state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT]) shift = 1; else shift = 0;
         
         if (state[SDL_SCANCODE_G]) {
