@@ -1,3 +1,5 @@
+// build : gcc main.c rift.c -lhidapi -o hmd
+
 // ********************* Includes       ********************* //
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,7 +62,7 @@ int kbhit()
   FD_SET(STDIN_FILENO, &fds); //STDIN_FILENO is 0
   select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
   return FD_ISSET(STDIN_FILENO, &fds);
-}*/
+}
 
 int main(int argc, char* argv[])
 {
@@ -214,6 +216,36 @@ int main(int argc, char* argv[])
   printf(L"/// Exit ///\n");
 
   return 0;
+}*/
+
+void clean(hid_device *handle) {
+  if (handle != NULL) hid_close(handle);
+  hid_exit();
+}
+
+int main(int argc, char* argv[]) {
+  hid_device *handle;
+  int res;
+
+  hid_init();
+  
+  handle = hid_open(0x2833, 0x0031, NULL);
+  if (handle == NULL) return 1; else rift_send_enable_components(handle,0);
+  
+  res = hid_set_nonblocking(handle, 1);
+  if( res < 0 ) return 1;
+  
+  res = rift_send_enable_components(handle,1);
+  
+  while (TRUE) {
+    res = rift_send_keep_alive(handle);
+    if (res < 0) {
+      clean(handle);
+      return 1;
+    }
+    Sleep(2500);
+  }
+
 }
 
 // EOF
