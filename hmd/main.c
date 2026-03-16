@@ -230,12 +230,16 @@ int main(int argc, char* argv[]) {
   hid_init();
   
   handle = hid_open(0x2833, 0x0031, NULL);
-  if (handle == NULL) return 1; else rift_send_enable_components(handle,0);
+  if (handle == NULL) return 1; 
+  
+  rift_send_enable_components(handle,0);
   
   res = hid_set_nonblocking(handle, 1);
   if( res < 0 ) return 1;
   
   res = rift_send_enable_components(handle,1);
+
+  printf("%d\n", res);
   
   while (TRUE) {
     res = rift_send_keep_alive(handle);
@@ -243,7 +247,7 @@ int main(int argc, char* argv[]) {
       clean(handle);
       return 1;
     }
-    Sleep(2500);
+    Sleep(500);
   }
 
 }
