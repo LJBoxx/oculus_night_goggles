@@ -15,6 +15,12 @@ $ gcc main.c uvc.c esp770u.c ar0134.c -I/c/msys64/ucrt64/include/libusb-1.0 -I/c
 ```
 
 ## Run
-```.\goggles.exe``` (sensor id 0 : first, 1 : second plugged in) *to be done exposure and gain settings* 
+```
+.\goggles.exe (sensor id 0 and 1 : first/second plugged in) (monitor, default to 0)
+``` 
+You should check which monitor your hmd uses in extended mode !
 You can change gain and exposure inside the window by pressing G or E and use modifier Shift to increase/decrease these values.
 E.G. : press e to decrease exposure and press shift and e to increase.
+
+# Demo 
+![alt text](demo_cam.gif)

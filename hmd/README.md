@@ -5,7 +5,20 @@ Now as i am using an intel igpu i have some issues with getting the hmd to displ
 Now using the hdmi on my laptop i get an 1920x1080@60hz resolution but i tried everything to force the 2160x1200@90hz setting with CRU (Custom Resolution Utility) to no avail...
 
 Though, if you can get it to display then you will have a fun hacked night vision goggle with an oculus cv1
-You could probably adapt it to work on linux, using the code from the original repo and compile ["sensor" binary](/sensor/README.md) for linux !
+You could probably adapt it to work on linux, using the code from the [orginal repo](https://github.com/OhioIon/riftDriverPi/tree/master) and compile ["sensor" binary](/sensor/README.md) for linux !
+
+## Build
+
+For windows using msys ucrt64:
+Install dependencies : 
+```
+$ pacman -S mingw-w64-ucrt-x86_64-hidapi
+```
+
+Build : 
+```
+$ gcc main.c rift.c -lhidapi -o hmd
+```
 
 ## Power on !!
 ![alt text](hmd_pwr_on.gif)

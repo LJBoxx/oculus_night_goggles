@@ -31,6 +31,8 @@ int running = 0;
 int sensor_id = 0; //default to first sensor
 int gain =64;
 int exposure = 400;
+int borderless = 1;
+int display = 0;
 
 void clean() {
     if (transfers) {
@@ -214,18 +216,25 @@ int init()
 
 int stream() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) return 1;
+    int border;
+    if (borderless == 1) border = SDL_WINDOW_BORDERLESS; else border = 0;
+    SDL_Window *win;
+    SDL_Rect displayBounds;
+    SDL_GetDisplayBounds(display, &displayBounds);
 
-    SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, 0);
-    //SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 960, 0);
-    SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
-    SDL_SetWindowResizable(win, SDL_TRUE);
-    /*//need to make something like that, but not for now since i gotta display that into the headset
     if (sensor_id == 1) {
-    put window on the right 
-    } else if (sensor_id == 0) {
-    put window on the left
+        win = SDL_CreateWindow("Oculus Cam", (displayBounds.w - FRAME_W) , SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, border);
+    } else {
+        win = SDL_CreateWindow("Oculus Cam", 0, SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, border);
     }
-    */
+    
+    //SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 960, border);
+    //SDL_Window *win = SDL_CreateWindow("Oculus Cam", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, FRAME_W, FRAME_H, border);
+    
+    //SDL_SetWindowResizable(win, SDL_TRUE);
+
+    SDL_Renderer *ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED);
+    SDL_RenderSetLogicalSize(ren, FRAME_W, FRAME_H);
     // Use IYUV; for grayscale we only update the Y-plane (first W*H bytes)
     SDL_Texture *tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, FRAME_W, FRAME_H);
 
@@ -307,7 +316,8 @@ int stream() {
 }
 
 int main(int argc, char *argv[]) {
-    sensor_id = atoi(argv[1]); //unsafe i think lol but whatever x) just dont put anything else than numbers
+    if (argc > 1) sensor_id = atoi(argv[1]);
+    if (argc > 2) display = atoi(argv[2]);
 /*    if (argv[2] != NULL) {
         gain = atoi(argv[2]);
     }
