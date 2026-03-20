@@ -6,7 +6,13 @@ It is made up of 2 main binaries, one that enable extended mode in the headset a
 In order to run this, you will need to have an oculus cv1 heaset and two Oculus Constellation sensor (basically infared webcams) if you have regular camera you could simply use it with the hmd binary.
 
 ## How to run it ?
-See [Sensor README](/sensor/README.md) then [HMD README](/hmd/README.md)
+```
+git clone https://github.com/LJBoxx/oculus_night_goggles.git
+```
+
+and see [Sensor README](/sensor/README.md) then [HMD README](/hmd/README.md)
+
+You can build or use the compiled binaries for windows
 
 ### Mentions
 This repo also contains code from [ouvrt](https://github.com/pH5/ouvrt) and some code insipred from [doc-ok](https://github.com/Doc-Ok/OculusRiftCV1Camera)
